@@ -23,6 +23,8 @@ const bikeLaneStyle = {
 const departuresByMinute = Array.from({ length: 1440 }, () => []);
 const arrivalsByMinute = Array.from({ length: 1440 }, () => []);
 
+const stationFlow = d3.scaleQuantize().domain([0, 1]).range([0, 0.5, 1]);
+
 function getCoords(station) {
   const point = new mapboxgl.LngLat(+station.lon, +station.lat);
   const { x, y } = map.project(point);
@@ -36,6 +38,10 @@ function formatTime(minutes) {
 
 function minutesSinceMidnight(date) {
   return date.getHours() * 60 + date.getMinutes();
+}
+
+function departureRatio(d) {
+  return d.totalTraffic ? stationFlow(d.departures / d.totalTraffic) : 0.5;
 }
 
 function filterByMinute(tripsByMinute, minute) {
@@ -136,6 +142,7 @@ map.on("load", async () => {
     .enter()
     .append("circle")
     .attr("r", (d) => radiusScale(d.totalTraffic))
+    .style("--departure-ratio", departureRatio)
     .each(function (d) {
       d3.select(this)
         .append("title")
@@ -168,6 +175,7 @@ map.on("load", async () => {
       .data(filteredStations, (d) => d.short_name)
       .join("circle")
       .attr("r", (d) => radiusScale(d.totalTraffic))
+      .style("--departure-ratio", departureRatio)
       .select("title")
       .text((d) => `${d.totalTraffic} trips (${d.departures} departures, ${d.arrivals} arrivals)`);
   }
