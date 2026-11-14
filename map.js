@@ -59,8 +59,37 @@ map.on("load", async () => {
     console.error("Error loading JSON:", error);
   }
 
-  const stations = jsonData.data.stations;
-  console.log("Stations Array:", stations);
+  let stations = jsonData.data.stations;
+
+  const trips = await d3.csv("https://dsc106.com/labs/lab07/data/bluebikes-traffic-2024-03.csv");
+  console.log("Trips:", trips.length);
+
+  const departures = d3.rollup(
+    trips,
+    (v) => v.length,
+    (d) => d.start_station_id
+  );
+
+  const arrivals = d3.rollup(
+    trips,
+    (v) => v.length,
+    (d) => d.end_station_id
+  );
+
+  stations = stations.map((station) => {
+    const id = station.short_name;
+    station.arrivals = arrivals.get(id) ?? 0;
+    station.departures = departures.get(id) ?? 0;
+    station.totalTraffic = station.arrivals + station.departures;
+    return station;
+  });
+
+  console.log("Stations with traffic:", stations);
+
+  const radiusScale = d3
+    .scaleSqrt()
+    .domain([0, d3.max(stations, (d) => d.totalTraffic)])
+    .range([0, 25]);
 
   const svg = d3.select("#map").select("svg");
 
@@ -69,7 +98,12 @@ map.on("load", async () => {
     .data(stations)
     .enter()
     .append("circle")
-    .attr("r", 5);
+    .attr("r", (d) => radiusScale(d.totalTraffic))
+    .each(function (d) {
+      d3.select(this)
+        .append("title")
+        .text(`${d.totalTraffic} trips (${d.departures} departures, ${d.arrivals} arrivals)`);
+    });
 
   function updatePositions() {
     circles
